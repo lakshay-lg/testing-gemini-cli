@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [snake, setSnake] = useState<Point[]>(INITIAL_SNAKE);
   const [food, setFood] = useState<Point>({ x: 5, y: 5 });
   const [direction, setDirection] = useState<Point>(INITIAL_DIRECTION);
+  const lastProcessedDirection = useRef<Point>(INITIAL_DIRECTION);
   const [isGameOver, setIsGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(
@@ -44,6 +45,8 @@ const App: React.FC = () => {
 
   const moveSnake = useCallback(() => {
     if (isGameOver) return;
+
+    lastProcessedDirection.current = direction;
 
     setSnake((prevSnake) => {
       const head = prevSnake[0];
@@ -85,29 +88,30 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const currentDir = lastProcessedDirection.current;
       switch (e.key) {
         case 'ArrowUp':
         case 'w':
-          if (direction.y !== 1) setDirection({ x: 0, y: -1 });
+          if (currentDir.y === 0) setDirection({ x: 0, y: -1 });
           break;
         case 'ArrowDown':
         case 's':
-          if (direction.y !== -1) setDirection({ x: 0, y: 1 });
+          if (currentDir.y === 0) setDirection({ x: 0, y: 1 });
           break;
         case 'ArrowLeft':
         case 'a':
-          if (direction.x !== 1) setDirection({ x: -1, y: 0 });
+          if (currentDir.x === 0) setDirection({ x: -1, y: 0 });
           break;
         case 'ArrowRight':
         case 'd':
-          if (direction.x !== -1) setDirection({ x: 1, y: 0 });
+          if (currentDir.x === 0) setDirection({ x: 1, y: 0 });
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [direction]);
+  }, []);
 
   useEffect(() => {
     if (isGameOver) {
