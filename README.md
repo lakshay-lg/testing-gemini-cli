@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# 🐍 Neon Snake
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, high-intensity **Neon Snake** game built with React, TypeScript, and Vite. Experience the classic arcade gameplay with a vibrant neon aesthetic, procedural sound effects, and challenging difficulty modes.
 
-Currently, two official plugins are available:
+![Neon Snake Screenshot Placeholder](https://via.placeholder.com/800x400/0d1117/00e5ff?text=NEON+SNAKE)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🌟 Features
 
-## React Compiler
+- **Vibrant Neon Aesthetic**: Dark mode with glowing neon colors for the snake, food, and power-ups.
+- **Procedural Audio**: 
+  - Dynamic synth background music that adapts to the game state and difficulty.
+  - Interactive sound effects for eating, power-ups, and game over.
+- **Difficulty Modes**:
+  - **EASY**: Relaxed pace for casual play.
+  - **NORMAL**: The standard balanced experience.
+  - **INSANE**: High-speed movement for the ultimate challenge.
+- **Power-Ups**:
+  - ⚡ **Speed Boost**: Temporarily increases snake speed.
+  - 💎 **2X Multiplier**: Double points for every food item eaten while active.
+- **Visual "Juice"**:
+  - Intense **Glitch Death Effect** with screen shake and red alerts.
+  - Real-time status timers for active power-ups.
+- **High Score Tracking**: Persistent high scores saved locally for each difficulty level.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Getting Started
 
-## Expanding the ESLint configuration
+### Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js (v18 or higher)
+- npm or yarn
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Installation
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/lakshay-lg/neon-snake.git
+   cd neon-snake
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+4. Open your browser and navigate to `http://localhost:5173`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🎮 Controls
+
+- **Movement**: Use `Arrow Keys` or `WASD`.
+- **Start/Restart**: Press any key to start or click the **RESTART** button.
+- **Difficulty Selection**: Select your preferred difficulty on the start or game-over screen.
+
+## 🛠️ Built With
+
+- [React](https://reactjs.org/) - Frontend framework
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
+- [Vite](https://vitejs.dev/) - Build tool and dev server
+- [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) - Procedural sound and music
+
+## 📄 License
+
+This project is open-source and available under the [MIT License](LICENSE).
