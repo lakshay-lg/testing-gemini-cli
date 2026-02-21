@@ -8,14 +8,22 @@ const INITIAL_SNAKE = [
   { x: 10, y: 12 },
 ];
 const INITIAL_DIRECTION = { x: 0, y: -1 };
-const INITIAL_SPEED = 150;
+
+type Difficulty = 'EASY' | 'NORMAL' | 'INSANE';
+const SPEED_MAP: Record<Difficulty, number> = { EASY: 200, NORMAL: 120, INSANE: 60 };
 
 interface Point {
   x: number;
   y: number;
 }
 
-const playSound = (type: 'eat' | 'move' | 'gameover') => {
+interface PowerUp {
+  pos: Point;
+  type: 'SPEED' | 'MULTIPLIER';
+  expires: number;
+}
+
+const playSound = (type: 'eat' | 'move' | 'gameover' | 'powerup') => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
@@ -39,17 +47,18 @@ const playSound = (type: 'eat' | 'move' | 'gameover') => {
     gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
     oscillator.start();
     oscillator.stop(audioCtx.currentTime + 0.5);
-  } else if (type === 'move') {
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(100, audioCtx.currentTime);
-    gainNode.gain.setValueAtTime(0.01, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+  } else if (type === 'powerup') {
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.2);
+    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
     oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.05);
+    oscillator.stop(audioCtx.currentTime + 0.2);
   }
 };
 
-const BackgroundMusic: React.FC<{ isPlaying: boolean }> = ({ isPlaying }) => {
+const BackgroundMusic: React.FC<{ isPlaying: boolean; difficulty: Difficulty }> = ({ isPlaying, difficulty }) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -58,36 +67,27 @@ const BackgroundMusic: React.FC<{ isPlaying: boolean }> = ({ isPlaying }) => {
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
 
+      const freq = difficulty === 'INSANE' ? 60 : difficulty === 'NORMAL' ? 45 : 35;
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(40, audioCtx.currentTime); 
+      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime); 
       
-      // Simple rhythmic pulse
       const now = audioCtx.currentTime;
+      const interval = difficulty === 'INSANE' ? 1 : difficulty === 'NORMAL' ? 1.5 : 2;
       for (let i = 0; i < 1000; i++) {
-        oscillator.frequency.setValueAtTime(40, now + i * 2);
-        oscillator.frequency.exponentialRampToValueAtTime(50, now + i * 2 + 0.5);
+        oscillator.frequency.setValueAtTime(freq, now + i * interval);
+        oscillator.frequency.exponentialRampToValueAtTime(freq + 10, now + i * interval + (interval/2));
       }
 
       gainNode.gain.setValueAtTime(0.015, audioCtx.currentTime);
-      
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
       oscillator.start();
-
       audioCtxRef.current = audioCtx;
-    } else {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
-      }
+    } else if (audioCtxRef.current) {
+      audioCtxRef.current.close();
     }
-
-    return () => {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
-      }
-    };
-  }, [isPlaying]);
-
+    return () => audioCtxRef.current?.close();
+  }, [isPlaying, difficulty]);
   return null;
 };
 
@@ -99,97 +99,68 @@ const App: React.FC = () => {
   const [isGameOver, setIsGameOver] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(
-    Number(localStorage.getItem('snake-high-score')) || 0
-  );
+  const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
+  const [powerUp, setPowerUp] = useState<PowerUp | null>(null);
+  const [activeEffects, setActiveEffects] = useState({ speed: 0, multiplier: 0 });
+  const [highScore, setHighScore] = useState(Number(localStorage.getItem(`snake-high-${difficulty}`)) || 0);
 
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateFood = useCallback((currentSnake: Point[]) => {
-    let newFood: Point;
+  const generatePos = useCallback((currentSnake: Point[]) => {
+    let newPos: Point;
     while (true) {
-      newFood = {
-        x: Math.floor(Math.random() * GRID_SIZE),
-        y: Math.floor(Math.random() * GRID_SIZE),
-      };
-      // Ensure food doesn't spawn on snake
-      if (!currentSnake.some((segment) => segment.x === newFood.x && segment.y === newFood.y)) {
-        break;
-      }
+      newPos = { x: Math.floor(Math.random() * GRID_SIZE), y: Math.floor(Math.random() * GRID_SIZE) };
+      if (!currentSnake.some(s => s.x === newPos.x && s.y === newPos.y)) return newPos;
     }
-    setFood(newFood);
   }, []);
 
   const moveSnake = useCallback(() => {
     if (isGameOver || !gameStarted) return;
-
     lastProcessedDirection.current = direction;
 
     setSnake((prevSnake) => {
       const head = prevSnake[0];
-      const newHead = {
-        x: head.x + direction.x,
-        y: head.y + direction.y,
-      };
+      const newHead = { x: head.x + direction.x, y: head.y + direction.y };
 
-      // Check collision with walls
-      if (
-        newHead.x < 0 ||
-        newHead.x >= GRID_SIZE ||
-        newHead.y < 0 ||
-        newHead.y >= GRID_SIZE
-      ) {
-        setIsGameOver(true);
-        playSound('gameover');
-        return prevSnake;
-      }
-
-      // Check collision with self
-      if (prevSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
+      if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE || 
+          prevSnake.some(s => s.x === newHead.x && s.y === newHead.y)) {
         setIsGameOver(true);
         playSound('gameover');
         return prevSnake;
       }
 
       const newSnake = [newHead, ...prevSnake];
-
-      // Check if food eaten
       if (newHead.x === food.x && newHead.y === food.y) {
-        setScore((prev) => prev + 10);
+        setScore(s => s + (activeEffects.multiplier > 0 ? 20 : 10));
         playSound('eat');
-        generateFood(newSnake);
+        setFood(generatePos(newSnake));
+        if (Math.random() < 0.2 && !powerUp) {
+          setPowerUp({ pos: generatePos(newSnake), type: Math.random() > 0.5 ? 'SPEED' : 'MULTIPLIER', expires: Date.now() + 5000 });
+        }
+      } else if (powerUp && newHead.x === powerUp.pos.x && newHead.y === powerUp.pos.y) {
+        playSound('powerup');
+        if (powerUp.type === 'SPEED') setActiveEffects(e => ({ ...e, speed: 50 }));
+        else setActiveEffects(e => ({ ...e, multiplier: 50 }));
+        setPowerUp(null);
       } else {
         newSnake.pop();
       }
-
       return newSnake;
     });
-  }, [direction, food, generateFood, isGameOver, gameStarted]);
+
+    setActiveEffects(e => ({ speed: Math.max(0, e.speed - 1), multiplier: Math.max(0, e.multiplier - 1) }));
+    if (powerUp && powerUp.expires < Date.now()) setPowerUp(null);
+  }, [direction, food, gameStarted, isGameOver, generatePos, powerUp, activeEffects]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!gameStarted && !isGameOver) setGameStarted(true);
       const currentDir = lastProcessedDirection.current;
-      switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-          if (currentDir.y === 0) setDirection({ x: 0, y: -1 });
-          break;
-        case 'ArrowDown':
-        case 's':
-          if (currentDir.y === 0) setDirection({ x: 0, y: 1 });
-          break;
-        case 'ArrowLeft':
-        case 'a':
-          if (currentDir.x === 0) setDirection({ x: -1, y: 0 });
-          break;
-        case 'ArrowRight':
-        case 'd':
-          if (currentDir.x === 0) setDirection({ x: 1, y: 0 });
-          break;
-      }
+      if ((e.key === 'ArrowUp' || e.key === 'w') && currentDir.y === 0) setDirection({ x: 0, y: -1 });
+      if ((e.key === 'ArrowDown' || e.key === 's') && currentDir.y === 0) setDirection({ x: 0, y: 1 });
+      if ((e.key === 'ArrowLeft' || e.key === 'a') && currentDir.x === 0) setDirection({ x: -1, y: 0 });
+      if ((e.key === 'ArrowRight' || e.key === 'd') && currentDir.x === 0) setDirection({ x: 1, y: 0 });
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameStarted, isGameOver]);
@@ -198,16 +169,14 @@ const App: React.FC = () => {
     if (isGameOver || !gameStarted) {
       if (isGameOver && score > highScore) {
         setHighScore(score);
-        localStorage.setItem('snake-high-score', score.toString());
+        localStorage.setItem(`snake-high-${difficulty}`, score.toString());
       }
       return;
     }
-
-    gameLoopRef.current = setInterval(moveSnake, INITIAL_SPEED - Math.min(score / 5, 100));
-    return () => {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    };
-  }, [moveSnake, isGameOver, score, highScore, gameStarted]);
+    const currentSpeed = SPEED_MAP[difficulty] - (activeEffects.speed > 0 ? 40 : 0);
+    gameLoopRef.current = setInterval(moveSnake, Math.max(30, currentSpeed));
+    return () => clearInterval(gameLoopRef.current!);
+  }, [moveSnake, isGameOver, gameStarted, difficulty, score, activeEffects.speed]);
 
   const resetGame = () => {
     setSnake(INITIAL_SNAKE);
@@ -215,45 +184,53 @@ const App: React.FC = () => {
     setScore(0);
     setIsGameOver(false);
     setGameStarted(true);
+    setPowerUp(null);
+    setActiveEffects({ speed: 0, multiplier: 0 });
     setFood({ x: 5, y: 5 });
   };
 
   return (
     <div className="game-container">
-      <BackgroundMusic isPlaying={gameStarted && !isGameOver} />
+      <BackgroundMusic isPlaying={gameStarted && !isGameOver} difficulty={difficulty} />
       <div className="score-board">
-        SCORE: {score} | HIGH SCORE: {highScore}
+        {difficulty} | SCORE: {score} | HIGH: {highScore}
       </div>
+      {!gameStarted && !isGameOver && (
+        <div className="difficulty-selector">
+          {(['EASY', 'NORMAL', 'INSANE'] as Difficulty[]).map(d => (
+            <button key={d} className={`difficulty-btn ${difficulty === d ? 'active' : ''}`} onClick={() => setDifficulty(d)}>{d}</button>
+          ))}
+        </div>
+      )}
       {!gameStarted && !isGameOver && (
         <div className="game-over-overlay">
           <h1 style={{ color: 'var(--score-color)' }}>NEON SNAKE</h1>
           <p>PRESS ANY KEY TO START</p>
         </div>
       )}
-      <div className="game-board">
+      <div className={`game-board ${isGameOver ? 'dead' : ''}`}>
         {Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, i) => {
-          const x = i % GRID_SIZE;
-          const y = Math.floor(i / GRID_SIZE);
+          const x = i % GRID_SIZE, y = Math.floor(i / GRID_SIZE);
           const isSnakeHead = snake[0].x === x && snake[0].y === y;
-          const isSnakeBody = snake.slice(1).some((s) => s.x === x && s.y === y);
+          const isSnakeBody = snake.slice(1).some(s => s.x === x && s.y === y);
           const isFood = food.x === x && food.y === y;
+          const isPowerUp = powerUp?.pos.x === x && powerUp?.pos.y === y;
 
           return (
-            <div
-              key={i}
-              className={`cell ${isSnakeHead ? 'snake-segment snake-head' : isSnakeBody ? 'snake-segment' : isFood ? 'food' : ''}`}
-            />
+            <div key={i} className={`cell ${isSnakeHead ? 'snake-segment snake-head' : isSnakeBody ? 'snake-segment' : isFood ? 'food' : isPowerUp ? `power-up-${powerUp.type.toLowerCase()}` : ''}`} />
           );
         })}
       </div>
       {isGameOver && (
         <div className="game-over-overlay">
           <h1>GAME OVER</h1>
-          <button className="restart-button" onClick={resetGame}>
-            RESTART
-          </button>
+          <button className="restart-button" onClick={resetGame}>RESTART</button>
         </div>
       )}
+      <div style={{ marginTop: '10px', display: 'flex', gap: '20px' }}>
+        {activeEffects.speed > 0 && <span style={{ color: '#00ffea' }}>SPEED BOOST: {activeEffects.speed}</span>}
+        {activeEffects.multiplier > 0 && <span style={{ color: '#ffea00' }}>2X MULTIPLIER: {activeEffects.multiplier}</span>}
+      </div>
     </div>
   );
 };
